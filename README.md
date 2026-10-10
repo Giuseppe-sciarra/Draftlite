@@ -2,6 +2,8 @@
 
 Scrittura di sceneggiature per Windows: la parte utile di Final Draft, senza le altre mille.
 
+**Download, guida e domande frequenti:** [tastieredigitali.tech/casi-studio/draftlite](https://tastieredigitali.tech/casi-studio/draftlite/)
+
 Un editor che sa cos'è una sceneggiatura — margini, maiuscole, rientri, paginazione — e che
 sta zitto su tutto il resto. Niente licenze, niente abbonamenti, un solo eseguibile.
 
@@ -252,8 +254,8 @@ I file della release hanno sempre lo stesso nome, quindi questi due link valgono
 puntano da soli all'ultima versione:
 
 ```
-https://github.com/Giuseppe-TD/DraftLite/releases/latest/download/DraftLite-Setup.exe
-https://github.com/Giuseppe-TD/DraftLite/releases/latest/download/DraftLite-Portabile.exe
+https://github.com/Giuseppe-sciarra/Draftlite/releases/latest/download/DraftLite-Setup.exe
+https://github.com/Giuseppe-sciarra/Draftlite/releases/latest/download/DraftLite-Portabile.exe
 ```
 
 ## Come è fatto
