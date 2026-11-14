@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace DraftLite.UI;
 
@@ -62,7 +64,31 @@ public sealed class AppSettings
     }
 
     public static string SettingsPath => Path.Combine(Folder, "settings.json");
-    public static string AutoSavePath => Path.Combine(Folder, "autosave.dlite");
+    /// <summary>Uno per processo: due finestre aperte non si sovrascrivono a vicenda.</summary>
+    public static string AutoSavePath => Path.Combine(Folder, "autosave-" + Environment.ProcessId + ".dlite");
+
+    /// <summary>L'autosave piu' recente lasciato da un DraftLite che non gira piu', o null.</summary>
+    public static string OrphanAutoSave()
+    {
+        foreach (var f in Directory.GetFiles(Folder, "autosave*.dlite").OrderByDescending(File.GetLastWriteTime))
+        {
+            var id = Path.GetFileNameWithoutExtension(f).Substring("autosave".Length).TrimStart('-');
+            if (int.TryParse(id, out int pid) && pid != Environment.ProcessId && IsDraftLite(pid)) continue;
+            return f;
+        }
+        return null;
+    }
+
+    private static bool IsDraftLite(int pid)
+    {
+        try
+        {
+            using var other = Process.GetProcessById(pid);
+            using var me = Process.GetCurrentProcess();
+            return other.ProcessName == me.ProcessName;
+        }
+        catch { return false; }   // quel processo non esiste piu'
+    }
 
     public static AppSettings Load()
     {
@@ -132,7 +158,10 @@ public sealed class AppSettings
             var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
             File.Copy(path, Path.Combine(backupDir, name + "-" + stamp + ext), true);
 
+            // solo le copie di questo file: "film-*" prenderebbe anche quelle di "film-2"
+            var mine = new Regex("^" + Regex.Escape(name) + @"-\d{8}-\d{6}" + Regex.Escape(ext) + "$", RegexOptions.IgnoreCase);
             var old = Directory.GetFiles(backupDir, name + "-*" + ext)
+                               .Where(f => mine.IsMatch(Path.GetFileName(f)))
                                .OrderByDescending(f => f)
                                .Skip(BackupCount)
                                .ToList();

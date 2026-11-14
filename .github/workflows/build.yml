@@ -121,6 +121,9 @@ jobs:
       - name: Restore
         run: dotnet restore "${{ steps.paths.outputs.csproj }}"
 
+      - name: Test
+        run: dotnet run --project "${{ steps.paths.outputs.root }}/tests/LayoutTests"
+
       - name: Publish (win-x64, self-contained)
         shell: pwsh
         run: |

@@ -11,6 +11,18 @@ sta zitto su tutto il resto. Niente licenze, niente abbonamenti, un solo eseguib
 
 ---
 
+## 1.7.0: filigrana, colori e correzioni
+
+- **Filigrana**: nel PDF sta sotto al testo, centrata in diagonale e grande quanto il foglio permette.
+- **Colori del testo**: confermare la finestra Aspetto non cancella più colori ed evidenziazioni messi a mano; i colori su intestazioni di scena, personaggi e transizioni restano alla riapertura; il colore scelto prima di scrivere non si perde; l'evidenziatore convive con il giallo delle note.
+- **Revisioni**: l'asterisco va solo sulle righe davvero cambiate, anche con modifiche lontane fra loro. Cambiare un colore non conta come modifica.
+- **Final Draft (.fdx)**: grassetto, corsivo e sottolineato si leggono e si salvano.
+- **Importazione** da Word, RTF e testo: asterischi e trattini bassi restano caratteri.
+- **Incolla**: il testo che arriva da Word o LibreOffice viene sempre riclassificato; quello copiato da DraftLite si riconosce anche con un formato pagina personalizzato.
+- **Salvataggio**: si scrive su un file temporaneo e poi si scambia, così un'interruzione non rovina il copione. Il salvataggio automatico è separato per ogni finestra aperta. Le copie in "Versioni DraftLite" non si confondono più tra file dal nome simile.
+- **Annulla**: Invio, Tab e suggerimenti restano nella cronologia.
+- Controllo aggiornamenti puntato al repository attuale; i test girano a ogni build.
+
 ## 1.6.1: correzioni area di scrittura e versionamento
 
 - Corretto il taglio a destra dei documenti importati da Final Draft: la scrollbar verticale non riduce più la larghezza utile del testo.

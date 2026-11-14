@@ -396,7 +396,7 @@ public sealed class ScreenplayEditor : RichTextBox
                 bool wasInternal = _internal;
                 _internal = true;
                 Select(start, text.Length);
-                SelectedText = up;
+                ReplaceSelection(up);
                 _internal = wasInternal;
                 text = up;
             }
@@ -453,6 +453,7 @@ public sealed class ScreenplayEditor : RichTextBox
 
         int selStart = SelectionStart, selLen = SelectionLength;
         var pending = selLen == 0 ? SelectionFont : null;
+        var pendingColor = selLen == 0 ? SelectionColor : Color.Empty;
         var scroll = GetScrollPos();
         bool saved = _internal;
         _internal = true;
@@ -486,7 +487,7 @@ public sealed class ScreenplayEditor : RichTextBox
         {
             Select(selStart, selLen);
             SetScrollPos(scroll);
-            RestoreCaretFormat(selLen, pending);
+            RestoreCaretFormat(selLen, pending, pendingColor);
             pending?.Dispose();
             ResumeDrawing();
             _internal = saved;
@@ -709,10 +710,6 @@ public sealed class ScreenplayEditor : RichTextBox
             var e = els[i];
             var st = DocumentLayout.Style(e.Type);
             var text = e.Text ?? string.Empty;
-            bool plainOnly = st.UpperCase;
-            if (plainOnly) text = StyledText.Plain(text).ToUpperInvariant();
-            if (e.Type == ElementType.Character && e.Dual) text += " ^";
-
             var typeColor = _elementColors.TryGetValue(e.Type, out var tc) ? tc : ForeColor;
             int colorIndex = ColorIndex(typeColor);
 
@@ -724,11 +721,12 @@ public sealed class ScreenplayEditor : RichTextBox
             sb.Append(st.RightAlign ? @"\qr" : @"\ql");
             sb.Append(@"\cf").Append(colorIndex);
 
-            if (plainOnly || !StyledText.HasMarkup(text))
+            if (!StyledText.HasMarkup(text))
             {
                 sb.Append(st.Bold ? @"\b" : @"\b0");
                 sb.Append(' ');
-                AppendRtfText(sb, plainOnly ? text : StyledText.Plain(text));
+                var plain = StyledText.Plain(text);
+                AppendRtfText(sb, st.UpperCase ? plain.ToUpperInvariant() : plain);
             }
             else
             {
@@ -747,10 +745,11 @@ public sealed class ScreenplayEditor : RichTextBox
                     else sb.Append(@"\highlight0");
 
                     sb.Append(' ');
-                    AppendRtfText(sb, run.Text);
+                    AppendRtfText(sb, st.UpperCase ? run.Text.ToUpperInvariant() : run.Text);
                 }
                 sb.Append(@"\b0\i0\ulnone\highlight0");
             }
+            if (e.Type == ElementType.Character && e.Dual) AppendRtfText(sb, " ^");
 
             if (i < els.Count - 1) sb.Append(@"\par");
         }
@@ -829,7 +828,10 @@ public sealed class ScreenplayEditor : RichTextBox
             if (Clipboard.ContainsData(DataFormats.Rtf))
             {
                 var rtf = Clipboard.GetData(DataFormats.Rtf) as string;
-                if (rtf != null && (rtf.Contains("\\li3168") || rtf.Contains("\\li2304") || rtf.Contains("\\li1440")))
+                // i nostri rientri, senza il foglio di stili che Word e LibreOffice mettono sempre
+                if (rtf != null && !rtf.Contains("\\stylesheet") &&
+                    new[] { ElementType.Character, ElementType.Parenthetical, ElementType.Dialogue }
+                        .Any(t => rtf.Contains("\\li" + DocumentLayout.Style(t).LeftTwips)))
                     return false;   // viene da noi: incolla normale
             }
 
@@ -845,12 +847,12 @@ public sealed class ScreenplayEditor : RichTextBox
                 if (!text.Contains('\n'))
                 {
                     var st0 = DocumentLayout.Style(CurrentType);
-                    SelectedText = st0.UpperCase ? text.ToUpperInvariant() : text;
+                    ReplaceSelection(st0.UpperCase ? text.ToUpperInvariant() : text);
                     return true;
                 }
 
                 int start = SelectionStart;
-                SelectedText = text;
+                ReplaceSelection(text);
                 int end = SelectionStart;
 
                 var t = CachedText;
@@ -1026,7 +1028,7 @@ public sealed class ScreenplayEditor : RichTextBox
         {
             bool s0 = _internal;
             _internal = true;
-            try { SelectedText = string.Empty; } finally { _internal = s0; }
+            try { ReplaceSelection(string.Empty); } finally { _internal = s0; }
         }
 
         var type = CurrentType;
@@ -1054,7 +1056,7 @@ public sealed class ScreenplayEditor : RichTextBox
         _internal = true;
         try
         {
-            SelectedText = "\n";
+            ReplaceSelection("\n");
             ApplyTypeToCurrentParagraph(next, false);
         }
         finally { _internal = saved; }
@@ -1084,9 +1086,9 @@ public sealed class ScreenplayEditor : RichTextBox
             _internal = true;
             try
             {
-                SelectedText = "\n";
+                ReplaceSelection("\n");
                 ApplyTypeToCurrentParagraph(ElementType.Parenthetical, false);
-                SelectedText = "()";
+                ReplaceSelection("()");
                 Select(SelectionStart - 1, 0);
             }
             finally { _internal = saved; }
@@ -1258,7 +1260,7 @@ public sealed class ScreenplayEditor : RichTextBox
         try
         {
             Select(s, e - s);
-            SelectedText = value;
+            ReplaceSelection(value);
             Select(s + value.Length, 0);
         }
         finally { _internal = saved; }
@@ -1375,6 +1377,7 @@ public sealed class ScreenplayEditor : RichTextBox
         var lines = CachedText.Split('\n');
         int selStart = SelectionStart, selLen = SelectionLength;
         var pending = selLen == 0 ? SelectionFont : null;
+        var pendingColor = selLen == 0 ? SelectionColor : Color.Empty;
         var scroll = GetScrollPos();
         bool saved = _internal;
         _internal = true;
@@ -1397,7 +1400,7 @@ public sealed class ScreenplayEditor : RichTextBox
         {
             Select(selStart, selLen);
             SetScrollPos(scroll);
-            RestoreCaretFormat(selLen, pending);
+            RestoreCaretFormat(selLen, pending, pendingColor);
             pending?.Dispose();
             ResumeDrawing();
             _internal = saved;
@@ -1453,13 +1456,15 @@ public sealed class ScreenplayEditor : RichTextBox
     /// del cursore no. Si rimette quello che c'era, cosi' un Ctrl+I dato e non ancora
     /// usato non se lo mangia il primo timer che passa.
     /// </summary>
-    private void RestoreCaretFormat(int selLen, Font pending = null)
+    private void RestoreCaretFormat(int selLen, Font pending = null, Color pendingColor = default)
     {
         if (selLen != 0 || !IsHandleCreated) return;
 
         if (pending != null)
         {
             SelectionFont = pending;
+            // anche il colore scelto per quello che si sta per scrivere
+            if (!pendingColor.IsEmpty) SelectionColor = pendingColor;
             return;
         }
 
@@ -1632,22 +1637,41 @@ public sealed class ScreenplayEditor : RichTextBox
 
         int selStart = SelectionStart, selLen = SelectionLength;
         var pending = selLen == 0 ? SelectionFont : null;
+        var pendingColor = selLen == 0 ? SelectionColor : Color.Empty;
         bool saved = _internal;
         _internal = true;
         SuspendDrawing();
         try
         {
-            Select(start, end - start);
-            SelectionBackColor = on ? _noteBack : BackColor;
+            PaintNoteBack(start, end - start, on);
         }
         finally
         {
             Select(selStart, selLen);
-            RestoreCaretFormat(selLen, pending);
+            RestoreCaretFormat(selLen, pending, pendingColor);
             pending?.Dispose();
             ResumeDrawing();
             _internal = saved;
         }
+    }
+
+    /// <summary>
+    /// Giallo nota solo dove non c'e' un evidenziatore messo a mano, e si toglie solo
+    /// il giallo nota: un tratto misto si dimezza finche' non e' di un colore solo.
+    /// </summary>
+    private void PaintNoteBack(int start, int len, bool on)
+    {
+        if (len <= 0) return;
+        Select(start, len);
+        var back = SelectionBackColor;
+        if (back.IsEmpty && len > 1)
+        {
+            PaintNoteBack(start, len / 2, on);
+            PaintNoteBack(start + len / 2, len - len / 2, on);
+            return;
+        }
+        if (back.ToArgb() == (on ? BackColor : _noteBack).ToArgb())
+            SelectionBackColor = on ? _noteBack : BackColor;
     }
 
     /// <summary>Ricolora tutte le righe che hanno una nota (dopo un caricamento o un cambio tema).</summary>
@@ -1664,6 +1688,7 @@ public sealed class ScreenplayEditor : RichTextBox
         var lines = t.Split('\n');
         int selStart = SelectionStart, selLen = SelectionLength;
         var pending = selLen == 0 ? SelectionFont : null;
+        var pendingColor = selLen == 0 ? SelectionColor : Color.Empty;
         bool saved = _internal;
         _internal = true;
         SuspendDrawing();
@@ -1680,18 +1705,7 @@ public sealed class ScreenplayEditor : RichTextBox
                     bool wantsNote = i < _meta.Count && _meta[i] != null &&
                                      !string.IsNullOrWhiteSpace(_meta[i].Note);
 
-                    Select(pos, len);
-                    if (wantsNote)
-                    {
-                        SelectionBackColor = _noteBack;
-                    }
-                    else
-                    {
-                        // si pulisce solo se era giallo nota: un colore scelto a mano resta
-                        var back = SelectionBackColor;
-                        if (!back.IsEmpty && back.ToArgb() == _noteBack.ToArgb())
-                            SelectionBackColor = BackColor;
-                    }
+                    PaintNoteBack(pos, len, wantsNote);
                 }
                 pos += len + 1;
             }
@@ -1699,7 +1713,7 @@ public sealed class ScreenplayEditor : RichTextBox
         finally
         {
             Select(selStart, selLen);
-            RestoreCaretFormat(selLen, pending);
+            RestoreCaretFormat(selLen, pending, pendingColor);
             pending?.Dispose();
             ResumeDrawing();
             _internal = saved;
@@ -1741,7 +1755,7 @@ public sealed class ScreenplayEditor : RichTextBox
         try
         {
             Select(start, text.Length);
-            SelectedText = updated;
+            ReplaceSelection(updated);
             Select(start + updated.Length, 0);
             ApplyTypeToCurrentParagraph(ElementType.Character, false);
         }
@@ -1771,7 +1785,7 @@ public sealed class ScreenplayEditor : RichTextBox
         try
         {
             Select(start, end - start);
-            SelectedText = updated;
+            ReplaceSelection(updated);
             Select(start + updated.Length, 0);
             ApplyTypeToCurrentParagraph(ElementType.Character, false);
         }
@@ -1790,8 +1804,9 @@ public sealed class ScreenplayEditor : RichTextBox
     private void ReplaceSelection(string text)
     {
         if (!IsHandleCreated) { SelectedText = text ?? string.Empty; return; }
+        // il fine paragrafo di RichEdit e' il CR
         NativeMethods.SendMessage(Handle, NativeMethods.EM_REPLACESEL,
-            (IntPtr)1, text ?? string.Empty);
+            (IntPtr)1, (text ?? string.Empty).Replace('\n', '\r'));
         _textCacheValid = false;
     }
 
@@ -2102,28 +2117,22 @@ public sealed class ScreenplayEditor : RichTextBox
     /// <summary>Colori di carta, inchiostro ed evidenziazione delle note.</summary>
     public void SetColors(Color back, Color fore, Color noteBack)
     {
+        if (back.ToArgb() == BackColor.ToArgb() && fore.ToArgb() == ForeColor.ToArgb() &&
+            noteBack.ToArgb() == _noteBack.ToArgb()) return;
+
+        // si rilegge con i colori vecchi e si riscrive con i nuovi: assegnare ForeColor
+        // ricolora tutto il documento e travolgerebbe quello che l'utente ha colorato a mano
+        bool hasText = IsHandleCreated && TextLength > 0;
+        int caret = hasText ? SelectionStart : 0;
+        var elements = hasText ? GetElements() : null;
+
         _noteBack = noteBack;
         BackColor = back;
         ForeColor = fore;
 
-        int selStart = SelectionStart, selLen = SelectionLength;
-        bool saved = _internal;
-        _internal = true;
-        SuspendDrawing();
-        try
-        {
-            SelectAll();
-            SelectionColor = fore;
-            SelectionBackColor = back;
-            Select(selStart, selLen);
-        }
-        finally
-        {
-            ResumeDrawing();
-            _internal = saved;
-        }
-
-        RefreshNoteHighlights();
+        if (elements == null) return;
+        SetElements(elements, false);
+        GoToCharIndex(Math.Min(caret, TextLength), false);
     }
 
     // ------------------------------------------------------------------ UTILITA'

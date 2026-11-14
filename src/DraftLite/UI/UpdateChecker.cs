@@ -19,7 +19,7 @@ namespace DraftLite.UI;
 /// </summary>
 public static class UpdateChecker
 {
-    public const string Repo = "Giuseppe-TD/DraftLite";
+    public const string Repo = "Giuseppe-sciarra/Draftlite";
     private const string ApiUrl = "https://api.github.com/repos/" + Repo + "/releases/latest";
     public const string ReleasesUrl = "https://github.com/" + Repo + "/releases/latest";
 
