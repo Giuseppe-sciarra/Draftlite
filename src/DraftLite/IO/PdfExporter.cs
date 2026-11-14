@@ -34,7 +34,6 @@ public static class PdfExporter
         if (setup.IncludeTitlePage && !sp.TitlePage.IsEmpty)
         {
             DrawTitlePage(pdf, sp, setup);
-            Decorate(pdf, setup);
         }
 
         var pages = Paginator.Paginate(sp, setup);
@@ -43,6 +42,7 @@ public static class PdfExporter
         for (int p = 0; p < pages.Count; p++)
         {
             pdf.BeginPage();
+            Decorate(pdf, setup);   // prima del testo: la filigrana resta sotto, non lo copre
 
             if (setup.PageNumbers && p > 0)
             {
@@ -79,8 +79,6 @@ public static class PdfExporter
                 if (revisionOn && line.Revised)
                     pdf.DrawText(rightEdge + 3 * CharW, y, "*", true);
             }
-
-            Decorate(pdf, setup);
         }
 
         if (pages.Count == 0) pdf.BeginPage();
@@ -94,16 +92,19 @@ public static class PdfExporter
         if (!string.IsNullOrWhiteSpace(setup.Watermark))
         {
             var text = setup.Watermark.Trim().ToUpperInvariant();
-            double diagonal = Math.Sqrt(setup.WidthPt * setup.WidthPt + setup.HeightPt * setup.HeightPt);
-
-            // il testo occupa circa due terzi della diagonale, qualunque sia la sua lunghezza
-            double size = Math.Min(52, Math.Max(13, diagonal * 0.66 / Math.Max(6, text.Length * 0.6)));
-            double length = text.Length * size * 0.6;
             double angle = Math.Min(45, Math.Atan2(setup.HeightPt, setup.WidthPt) * 180.0 / Math.PI);
             double rad = angle * Math.PI / 180.0;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
 
-            double x = setup.WidthPt / 2 - Math.Cos(rad) * length / 2;
-            double yFromTop = setup.HeightPt / 2 + Math.Sin(rad) * length / 2 - size * 0.35;
+            // grossa quanto il foglio permette: la scritta inclinata riempie il 90% della pagina
+            double room = 0.9 * Math.Min(setup.WidthPt / cos, setup.HeightPt / sin);
+            double size = Math.Min(140, room / (text.Length * 0.6));
+            double length = text.Length * size * 0.6;
+            double capHeight = size * 0.56;   // altezza delle maiuscole del Courier
+
+            // centro della scritta = centro del foglio
+            double x = setup.WidthPt / 2 - cos * length / 2 + sin * capHeight / 2;
+            double yFromTop = setup.HeightPt / 2 + sin * length / 2 + cos * capHeight / 2;
             pdf.DrawRotatedText(x, yFromTop, text, angle, size, 0.86);
         }
 
@@ -119,6 +120,7 @@ public static class PdfExporter
     {
         var tp = sp.TitlePage;
         pdf.BeginPage();
+        Decorate(pdf, setup);
 
         double Center(string s) => (setup.WidthPt - s.Length * CharW) / 2.0;
         double left = setup.LeftMarginInch * 72.0;

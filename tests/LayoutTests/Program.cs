@@ -68,6 +68,16 @@ try
     sp.Layout.Paragraphs[ElementType.Action].Right = 4;
     var narrow = Paginator.Paginate(sp, PageSetup.Letter()).Sum(p => p.Lines.Count);
     Check(narrow > wide, "Paginazione usa larghezza importata");
+    var marked = PageSetup.A4();
+    marked.Watermark = "Mario Rossi";
+    var pdfBytes = PdfExporter.Build(sp, marked);
+    var latin = System.Text.Encoding.Latin1;
+    int streamAt = latin.GetString(pdfBytes).IndexOf("stream\n", StringComparison.Ordinal) + 7;
+    using var inflate = new System.IO.Compression.ZLibStream(
+        new MemoryStream(pdfBytes, streamAt, pdfBytes.Length - streamAt), System.IO.Compression.CompressionMode.Decompress);
+    var content = new StreamReader(inflate, latin).ReadToEnd();
+    int markAt = content.IndexOf("(MARIO ROSSI)", StringComparison.Ordinal);
+    Check(markAt >= 0 && markAt < content.IndexOf("(parola", StringComparison.Ordinal), "Filigrana sotto al testo");
     Console.WriteLine($"{checks} verifiche superate.");
 }
 finally { Directory.Delete(folder, true); }

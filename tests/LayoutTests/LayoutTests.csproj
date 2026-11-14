@@ -9,5 +9,8 @@
     <Compile Include="../../src/DraftLite/IO/DraftLiteFile.cs" />
     <Compile Include="../../src/DraftLite/IO/PageSetup.cs" />
     <Compile Include="../../src/DraftLite/IO/Paginator.cs" />
+    <Compile Include="../../src/DraftLite/IO/PdfBuilder.cs" />
+    <Compile Include="../../src/DraftLite/IO/PdfExporter.cs" />
+    <Compile Include="../../src/DraftLite/IO/ScreenplayStats.cs" />
   </ItemGroup>
 </Project>
