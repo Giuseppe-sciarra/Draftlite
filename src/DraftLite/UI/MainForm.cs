@@ -1435,12 +1435,15 @@ public sealed class MainForm : Form
             _settings.MakeBackup(_path);
 
             var sp = CurrentScreenplay();
+            // si scrive accanto e poi si scambia: se qualcosa salta a meta', il file buono resta intero
+            var tmp = _path + ".tmp";
             switch (_format)
             {
-                case DocFormat.Fountain: FountainIO.Save(_path, sp); break;
-                case DocFormat.Fdx: FdxIO.Save(_path, sp); break;
-                default: DraftLiteFile.Save(_path, sp); break;
+                case DocFormat.Fountain: FountainIO.Save(tmp, sp); break;
+                case DocFormat.Fdx: FdxIO.Save(tmp, sp); break;
+                default: DraftLiteFile.Save(tmp, sp); break;
             }
+            File.Move(tmp, _path, true);
             SetDirty(false);
             TryDeleteAutoSave();
             return true;
@@ -1652,18 +1655,22 @@ public sealed class MainForm : Form
     {
         try
         {
-            if (!File.Exists(AppSettings.AutoSavePath)) return;
-            var when = File.GetLastWriteTime(AppSettings.AutoSavePath);
+            var orphan = AppSettings.OrphanAutoSave();
+            if (orphan == null) return;
+            var when = File.GetLastWriteTime(orphan);
             var r = MessageBox.Show(this,
                 "C'e' un salvataggio automatico del " + when.ToString("dd/MM/yyyy HH:mm") +
                 ".\n\nRecuperarlo?", "DraftLite", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (r == DialogResult.Yes)
             {
-                var sp = DraftLiteFile.Load(AppSettings.AutoSavePath);
+                var sp = DraftLiteFile.Load(orphan);
                 LoadScreenplay(sp, null, DocFormat.DraftLite);
                 SetDirty(true);
+                AutoSave();   // subito al sicuro sotto questo processo
+                if (!File.Exists(AppSettings.AutoSavePath) ||
+                    string.Equals(orphan, AppSettings.AutoSavePath, StringComparison.OrdinalIgnoreCase)) return;
             }
-            else TryDeleteAutoSave();
+            File.Delete(orphan);
         }
         catch { }
     }
@@ -1986,7 +1993,7 @@ public sealed class MainForm : Form
             {
                 SceneIndex = i,
                 Number = i < numbers.Count ? numbers[i] : (i + 1).ToString(),
-                Heading = headEl.Text,
+                Heading = StyledText.Plain(headEl.Text),
                 Synopsis = headEl.Synopsis ?? string.Empty,
                 Color = headEl.Color
             });

@@ -39,8 +39,8 @@ public static class FdxIO
                 if (p.Ancestors().Any(a => a.Name.LocalName is "ScriptNote" or "Summary")) continue;
 
                 var typeAttr = (string)p.Attribute("Type") ?? "Action";
-                var text = ReadOwnText(p);
-                if (string.IsNullOrWhiteSpace(text)) continue;
+                if (string.IsNullOrWhiteSpace(ReadOwnText(p))) continue;
+                var text = ReadStyledText(p);
 
                 var el = new ScreenElement(MapType(typeAttr), text)
                 {
@@ -152,6 +152,24 @@ public static class FdxIO
         return sb.ToString().Replace("\r", " ").Replace("\n", " ").Trim();
     }
 
+    /// <summary>Come ReadOwnText, ma tiene grassetto, corsivo e sottolineato dei Text di Final Draft.</summary>
+    private static string ReadStyledText(XElement paragraph)
+    {
+        var runs = new List<TextRun>();
+        foreach (var t in paragraph.Elements().Where(e => e.Name.LocalName == "Text"))
+        {
+            var style = (string)t.Attribute("Style") ?? string.Empty;
+            runs.Add(new TextRun(t.Value.Replace("\r", " ").Replace("\n", " "),
+                style.Contains("Bold"), style.Contains("Italic"), style.Contains("Underline")));
+        }
+        if (runs.Count > 0)
+        {
+            runs[0].Text = runs[0].Text.TrimStart();
+            runs[runs.Count - 1].Text = runs[runs.Count - 1].Text.TrimEnd();
+        }
+        return StyledText.Write(runs);
+    }
+
     private static string ReadNote(XElement paragraph)
     {
         var notes = paragraph.Elements().Where(e => e.Name.LocalName == "ScriptNote").ToList();
@@ -260,7 +278,15 @@ public static class FdxIO
                 p.Add(props);
             }
 
-            p.Add(new XElement("Text", StyledText.Plain(e.Text)));
+            foreach (var run in StyledText.Parse(e.Text))
+            {
+                if (run.Text.Length == 0) continue;
+                var t = new XElement("Text", run.Text);
+                var style = string.Join("+", new[] { run.Bold ? "Bold" : null, run.Italic ? "Italic" : null,
+                                                     run.Underline ? "Underline" : null }.Where(x => x != null));
+                if (style.Length > 0) t.Add(new XAttribute("Style", style));
+                p.Add(t);
+            }
 
             if (!string.IsNullOrWhiteSpace(e.Note))
             {

@@ -78,6 +78,23 @@ try
     var content = new StreamReader(inflate, latin).ReadToEnd();
     int markAt = content.IndexOf("(MARIO ROSSI)", StringComparison.Ordinal);
     Check(markAt >= 0 && markAt < content.IndexOf("(parola", StringComparison.Ordinal), "Filigrana sotto al testo");
+    // revisioni: due modifiche lontane non marcano quello che sta in mezzo, e il colore non conta
+    var lines = Enumerable.Range(0, 200).Select(n => new ScreenElement(ElementType.Action, "riga " + n)).ToList();
+    var revision = new Revision { Active = true, Snapshot = Revision.TakeSnapshot(lines) };
+    lines[3].Text = "cambiata";
+    lines[100].Text = "{c:FF0000}riga 100{/c}";
+    lines.Insert(150, new ScreenElement(ElementType.Action, "nuova"));
+    lines.RemoveAt(180);
+    var changedRows = revision.MarkChanged(lines).Select((on, n) => on ? n : -1).Where(n => n >= 0).ToArray();
+    Check(changedRows.SequenceEqual(new[] { 3, 150 }), "Revisione: solo le righe cambiate");
+    revision.Snapshot = new() { "tutto diverso" };
+    Check(revision.MarkChanged(lines).All(on => on), "Revisione: riscrittura completa");
+
+    // FDX: grassetto e corsivo fanno il giro, i caratteri speciali restano caratteri
+    var styled = new Screenplay { Elements = new() { new ScreenElement(ElementType.Action, "prima **forte** e *storto* 2 \\* 3 nome\\_file") } };
+    FdxIO.Save(fdx, styled);
+    Check(FdxIO.Load(fdx).Elements[0].Text == styled.Elements[0].Text, "Round trip FDX con stili");
+    Check(StyledText.Plain(StyledText.Escape("a_b *c* {c:FF0000}")) == "a_b *c* {c:FF0000}", "Testo importato letterale");
     Console.WriteLine($"{checks} verifiche superate.");
 }
 finally { Directory.Delete(folder, true); }

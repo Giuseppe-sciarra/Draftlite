@@ -187,6 +187,9 @@ public static class StyledText
         return sb.ToString();
     }
 
+    /// <summary>Testo qualunque reso letterale: asterischi e trattini bassi restano caratteri.</summary>
+    public static string Escape(string plain) => Write(new[] { new TextRun(plain) });
+
     /// <summary>Toglie colori ed evidenziazioni, lasciando grassetto e corsivo: serve per Fountain e FDX.</summary>
     public static string WithoutColors(string text)
     {

@@ -34,12 +34,15 @@ public static class TextImporter
     public static Screenplay Load(string path)
     {
         var ext = Path.GetExtension(path).ToLowerInvariant();
-        return ext switch
+        var sp = ext switch
         {
             ".docx" => FromParagraphs(ReadDocx(path), Path.GetFileNameWithoutExtension(path)),
             ".rtf" => FromParagraphs(ReadRtf(File.ReadAllText(path, Encoding.UTF8)), Path.GetFileNameWithoutExtension(path)),
             _ => FromPlainText(File.ReadAllText(path, Encoding.UTF8), Path.GetFileNameWithoutExtension(path))
         };
+        // asterischi e trattini bassi di un testo importato sono caratteri, non marcatori
+        foreach (var e in sp.Elements) e.Text = StyledText.Escape(e.Text);
+        return sp;
     }
 
     // ---------------------------------------------------------------- DOCX
